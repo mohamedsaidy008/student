@@ -2053,6 +2053,60 @@
         for (const id of ['importHome', 'importResult']) $(id).onclick = () => $('jsonFile').click();
         $('jsonFile').onchange = async e => { const f = e.target.files?.[0]; if (!f) return; try { const d = JSON.parse(await f.text()); if (!valid(d)) throw Error('الملف غير متوافق'); source = d; chosen = {}; saveChoices(); drawSubjects(); show('choose'); toast('تم استيراد الجدول') } catch (err) { toast('تعذّر فتح الملف: ' + err.message) } finally { e.target.value = '' } };
     </script>
+    <!-- ============================================================
+     عدّاد زيارات منظومة الجداول (نموذج الجلسات: عودة بعد ساعة = زيارة جديدة) — يُلصق كما هو قبل </body> مباشرة
+     يعتمد على مشروع Firebase Data (carengocount)
+     ============================================================ -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+(function () {
+    'use strict';
+    try {
+        /* سطر العرض — يُحقن تلقائياً في أعلى تذييل الصفحة */
+        var line = document.createElement('p');
+        line.style.cssText = 'text-align:center;color:#3a526f;font-size:13px;margin:6px 0';
+        line.innerHTML = 'زيارات اليوم: <b id="visToday" style="color:#245bd6">…</b> &nbsp;·&nbsp; إجمالي الزيارات: <b id="visTotal" style="color:#245bd6">…</b>';
+        var footer = document.querySelector('.end');
+        if (footer) footer.insertBefore(line, footer.firstChild);
+        else document.body.appendChild(line);
+
+        if (!window.firebase) return;
+        if (!firebase.apps.length) firebase.initializeApp({
+            apiKey: "AIzaSyDu4vy2tVqpkqzStdxZbRK-vohrQVxXIkY",
+            authDomain: "studio-6598686877-c9281.firebaseapp.com",
+            databaseURL: "https://carengocount-default-rtdb.firebaseio.com",
+            projectId: "carengocount",
+            appId: "1:770281294675:web:b48df5992f23a2da5cefa6"
+        });
+        var db = firebase.database();
+        var base = 'counters/visitors/student_tool';
+        var now = new Date(), pad = function (n) { return String(n).padStart(2, '0'); };
+        var today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+        var totalRef = db.ref(base + '/total');
+        var dayRef = db.ref(base + '/daily/' + today);
+        function show(ref, id) {
+            ref.on('value', function (s) {
+                var el = document.getElementById(id);
+                if (el) el.textContent = (typeof s.val() === 'number') ? s.val() : 0;
+            }, function () { });
+        }
+        show(totalRef, 'visTotal');
+        show(dayRef, 'visToday');
+        /* نموذج الجلسات: العودة بعد غياب أكثر من ساعة = زيارة جديدة */
+        var last = 0;
+        try { last = parseInt(localStorage.getItem('artiatech_vis_last') || '0', 10) || 0; } catch (e) { }
+        if (Date.now() - last > 60 * 60 * 1000) {
+            var stamped = false;
+            function stamp() { if (!stamped) { stamped = true; try { localStorage.setItem('artiatech_vis_last', String(Date.now())); } catch (e) { } } }
+            totalRef.transaction(function (c) { return (c || 0) + 1; }, function (err, ok) { if (!err && ok) stamp(); });
+            dayRef.transaction(function (c) { return (c || 0) + 1; }, function (err, ok) { if (!err && ok) stamp(); });
+        }
+    } catch (e) { /* العداد إضافة تجميلية — فشله لا يعطّل المنظومة */ }
+})();
+</script>
+<!-- ============ نهاية عدّاد الزوار ============ -->
+
 </body>
 
 </html>
